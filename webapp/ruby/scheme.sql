@@ -1,11 +1,20 @@
-DROP TABLE IF EXISTS `ads`;
+DROP TABLE IF EXISTS `click`;
+CREATE TABLE click (
+  filename text NOT NULL,
+  ad_id text NOT NULL,
+  agent text,
+  age int DEFAULT NULL,
+  gender text,
+  INDEX idx_filename(filename),
+  INDEX idx_ad_id(ad_id)
+);
 
-CREATE TABLE ads (
-`advertiser` varchar(255) NOT NULL,
-`ad_id` varchar(255),
-`user` varchar(255),
-`agent` varchar(255),
-`gender` varchar(255),
-`age` varchar(255),
-PRIMARY KEY(`advertiser`)
-) ENGNE=InnoDB;
+
+DROP TABLE IF EXISTS `click_counter`;
+CREATE TABLE click_counter (
+  filename text NOT NULL,
+  ad_id text NOT NULL,
+  counter int,
+  INDEX idx_filename(filename),
+  INDEX idx_ad_id(ad_id)
+);
