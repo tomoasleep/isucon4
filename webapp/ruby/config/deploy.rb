@@ -74,7 +74,7 @@ namespace :deploy do
   desc 'Restart application'
   task :restart do
     on roles(:app), in: :sequence, wait: 5 do
-      execute "cd #{current_path};./env.sh bundle install"
+      execute "cd #{current_path}/webapp/ruby;/home/isucon/env.sh bundle install"
       # Your restart mechanism here, for example:
       # execute :touch, release_path.join('tmp/restart.txt')
     end
@@ -92,9 +92,15 @@ end
 
 task :bench do
   on roles(:bench) do
-    execute "/home/isucon/benchmarker bench --hosts 203.104.111.163 --workload 2"
+    execute "/home/isucon/benchmarker bench --hosts 203.104.111.163 --workload 1"
   end
 end
+
+# after :bench do
+#   on roles(:app) do
+#     execute "mv /tmp/isucon.ruby.log #{Time.now}"
+#   end
+# end
 
 
 namespace :nginx do
