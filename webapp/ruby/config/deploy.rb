@@ -20,7 +20,7 @@ lock '3.2.1'
 # set :log_level, :debug
 
 # Default value for :pty is false
-# set :pty, true
+ set :pty, true
 
 # Default value for :linked_files is []
 # set :linked_files, %w{config/database.yml}
@@ -102,6 +102,14 @@ end
 #   end
 # end
 
+
+namespace :db do
+  task :refresh do
+    on roles(:db) do
+      execute :sudo, "rm -rf /var/www/html/webdav/*"
+    end
+  end
+end
 
 namespace :nginx do
   task :reload do
