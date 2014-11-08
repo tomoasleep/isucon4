@@ -20,9 +20,8 @@ module Isucon4
     # use Rack::Lineprof, profile: 'app.rb'
 
     helpers do
-      def connection
-        return $mysql if $mysql
-        $mysql = Mysql2::Client.new(
+      def db
+        $mysql ||= Mysql2::Client.new(
           :host      => "203.104.111.161",
           :port      => 3306,
           :username  => "isucon",
@@ -95,24 +94,6 @@ module Isucon4
         return {gender: :unknown, age: nil} if !id || id.empty?
         gender, age = id.split('/', 2).map(&:to_i)
         {gender: gender == 0 ? :female : :male, age: age}
-      end
-
-      def get_log(id)
-        connection.xquery(" SELECT ad_id, user, agent, generation, age, FROM ads
-WHERE advertiser = ?
-GROUP BY ad_id
-", id.split('/').last).first
-        # $mongo.find(id.split('/').last).each.map do |doc|
-        #   doc.merge(decode_user_key(user))
-        # end.group_by { |click| click[:ad_id] }
-
-        # open(path, 'r') do |io|
-        #   io.flock File::LOCK_SH
-        #   io.read.each_line.map do |line|
-        #     ad_id, user, agent = line.chomp.split(?\t,3)
-        #     {ad_id: ad_id, user: user, agent: agent && !agent.empty? ? agent : :unknown}.merge(decode_user_key(user))
-        #   end.group_by { |click| click[:ad_id] }
-        # end
       end
 
       def send_asset(slot, id, asset)
@@ -257,21 +238,20 @@ GROUP BY ad_id
         content_type :json
         next {error: :not_found}.to_json
       end
-      tmp = decode_user_key(request.user_agent)
-      #     {ad_id: ad_id, user: user, agent: agent && !agent.empty? ? agent : :unknown}.merge(decode_user_key(user))
-      connection.xquery("INSERT INTO ads VALUES (advertiser, ad_id, user, agent, gender, age) (?, ?, ?, ?, ?, ?) ",
-                     ad['advertiser'].split('/').last,
-                     ad['id'],
-                     request.cookies['isuad'],
-                     request.user_agent,
-                     tmp[:gender],
-                     tmp[:age])
+      filename = ad['advertiser'].split('/').last
 
-      connection.xquery("UPDATE TABLE click_counter SET counter = counter + 1 WHERE ad_id = ?", ad_key(params[:slot], params[:id]))
-      # open(LOG_DIR.join(ad['advertiser'].split('/').last), 'a') do |io|
-      #   io.flock File::LOCK_EX
-      #   io.puts([ad['id'], request.cookies['isuad'], request.user_agent].join(?\t))
-      # end
+      user = decode_user_key(request.cookies['isuad'])
+      agent = (tmp = request.user_agent) && !tmp.empty? ? tmp : :unknown
+
+      gender = user[:gender]
+      age = user[:age]
+
+      db.xquery("INSERT INTO click VALUES (filename, ad_id, agent, age, gender) (?, ?, ?, ?, ?, ?) ",
+                filename, ad['id'],
+                agent, age, gender)
+
+      db.xquery("UPDATE TABLE click_counter SET counter = counter + 1 WHERE filename = ? AND ad_id = ?",
+                filename, ad['id']))
 
       redirect ad['destination']
     end
@@ -292,8 +272,9 @@ GROUP BY ad_id
           report[ad['id']] = {ad: ad, clicks: 0, impressions: ad['impressions']}
         end
 
-        get_log(advertiser_id).each do |ad_id, clicks|
-          report[ad_id][:clicks] = clicks.size
+        logs = db.xquery("SELECT * FROM click_counter WHERE filename = ?", advertiser_id.split('/').last)
+        logs.each do |log|
+          report[log['ad_id']][:clicks] = log['counter'].to_i
         end
       end.to_json
     end
@@ -314,7 +295,8 @@ GROUP BY ad_id
           reports[ad['id']] = {ad: ad, clicks: 0, impressions: ad['impressions']}
         end
 
-        logs = get_log(advertiser_id)
+        res = db.xquery("SELECT * FROM click WHERE filename = ?", advertiser_id.split('/').last)
+        logs = res.group_by { |content| content['ad_id'] }
 
         reports.each do |ad_id, report|
           log = logs[ad_id] || []
@@ -322,9 +304,9 @@ GROUP BY ad_id
 
           breakdown = report[:breakdown] = {}
 
-          breakdown[:gender] = log.group_by{ |_| _[:gender] }.map{ |k,v| [k,v.size] }.to_h
-          breakdown[:agents] = log.group_by{ |_| _[:agent] }.map{ |k,v| [k,v.size] }.to_h
-          breakdown[:generations] = log.group_by{ |_| _[:age] ? _[:age].to_i / 10 : :unknown }.map{ |k,v| [k,v.size] }.to_h
+          breakdown[:gender] = log.group_by{ |_| _['gender'] }.map{ |k,v| [k,v.size] }.to_h
+          breakdown[:agents] = log.group_by{ |_| _['agent'] }.map{ |k,v| [k,v.size] }.to_h
+          breakdown[:generations] = log.group_by{ |_| _['age'] ? _['age'].to_i / 10 : :unknown }.map{ |k,v| [k,v.size] }.to_h
         end
       end.to_json
     end
