@@ -7,6 +7,7 @@ require 'rack/request'
 # require 'rack-lineprof'
 require 'tempfile'
 require 'net/dav'
+require 'open-uri'
 
 module Isucon4
   class App < Sinatra::Base
@@ -307,6 +308,10 @@ module Isucon4
       end
 
       LOG_DIR.children.each(&:delete)
+      begin
+        open File.join(webdav_url, 'delete_all')
+      rescue
+      end
 
       content_type 'text/plain'
       "OK"
