@@ -5,6 +5,8 @@ require 'redis'
 require 'json'
 require 'rack/request'
 # require 'rack-lineprof'
+require 'tempfile'
+require 'net/dav'
 
 module Isucon4
   class App < Sinatra::Base
@@ -25,12 +27,12 @@ module Isucon4
         Redis.current
       end
 
-      def ad_key(slot, id)
-        "isu4:ad:#{slot}-#{id}"
+      def webdav_url
+        'http://203.104.111.161'
       end
 
-      def asset_key(slot, id)
-        "isu4:asset:#{slot}-#{id}"
+      def ad_key(slot, id)
+        "isu4:ad:#{slot}-#{id}"
       end
 
       def advertiser_key(id)
@@ -94,6 +96,23 @@ module Isucon4
           end.group_by { |click| click[:ad_id] }
         end
       end
+
+      def send_asset(slot, id, asset)
+        Net::DAV.start(webdav_url) do |dav|
+          dav.put(File.join('.', 'assets', slot.to_s, id.to_s),
+                  asset,
+                  asset.size)
+        end
+        # puts "Sent: #{slot}/#{id}"
+      end
+
+      def fetch_asset(slot, id)
+        content = nil
+        Net::DAV.start(webdav_url) do |dav|
+          content = dav.get(File.join('.', 'assets', slot.to_s, id.to_s))
+        end
+        return content
+      end
     end
 
     get '/' do
@@ -121,7 +140,8 @@ module Isucon4
         'destination', params[:destination],
         'impressions', 0,
       )
-      redis.set(asset_key(slot,id), asset.read)
+
+      send_asset(slot, id, asset)
       redis.rpush(slot_key(slot), id)
       redis.sadd(advertiser_key(advertiser_id), key)
 
@@ -156,7 +176,7 @@ module Isucon4
       ad = get_ad(params[:slot], params[:id])
       if ad
         content_type ad['type'] || 'application/octet-stream'
-        data = redis.get(asset_key(params[:slot],params[:id])).b
+        data = fetch_asset(params[:slot], params[:id])
 
         # Chrome sends us Range request even we declines...
         range = request.env['HTTP_RANGE'] 
@@ -281,3 +301,5 @@ module Isucon4
     end
   end
 end
+
+
