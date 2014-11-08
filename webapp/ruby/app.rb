@@ -24,8 +24,8 @@ module Isucon4
         $mysql ||= Mysql2::Client.new(
           :host      => "203.104.111.161",
           :port      => 3306,
-          :username  => "isucon",
-          :password  => "isunageruna",
+          :username  => "root",
+          :password  => "",
           :database  => "isucon",
           :reconnect => true,
         )
