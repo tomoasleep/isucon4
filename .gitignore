@@ -1,0 +1,5 @@
+.local
+.ssh
+.bash_*
+.*
+sample_creatives
