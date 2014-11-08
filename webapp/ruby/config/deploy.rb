@@ -60,7 +60,7 @@ lock '3.2.1'
 set :application, ''
 set :repo_url, 'git@github.com:tomoasleep/isucon4.git'
 # ask :branch, proc { `git rev-parse --abbrev-ref HEAD`.chomp }
-set :deploy_to, '/home/isucon/isucon3'
+set :deploy_to, '/home/isucon/deploy'
 set :scm, :git
 # set :format, :pretty
 # set :log_level, :debug
@@ -74,7 +74,7 @@ namespace :deploy do
   desc 'Restart application'
   task :restart do
     on roles(:app), in: :sequence, wait: 5 do
-      execute "cd #{current_path}/ruby;. /etc/env.sh; bundle install"
+      execute "cd #{current_path};./env.sh bundle install"
       # Your restart mechanism here, for example:
       # execute :touch, release_path.join('tmp/restart.txt')
     end
