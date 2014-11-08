@@ -48,7 +48,7 @@ module Isucon4
       def next_ad(slot)
         key = slot_key(slot)
 
-        id = redis.rpoplpush(key, key)
+        id = redis.rpoplpush(key, key) #O(1)
         unless id
           return nil
         end
@@ -57,7 +57,7 @@ module Isucon4
         if ad
           ad
         else
-          redis.lrem(key, 0, id)
+          redis.lrem(key, 0, id) #REDIS: O(N)
           next_ad(slot)
         end
       end
@@ -156,7 +156,7 @@ module Isucon4
       ad = get_ad(params[:slot], params[:id])
       if ad
         content_type ad['type'] || 'application/octet-stream'
-        data = redis.get(asset_key(params[:slot],params[:id])).b
+        data = redis.get(asset_key(params[:slot],params[:id])).b #REDIS:very slow
 
         # Chrome sends us Range request even we declines...
         range = request.env['HTTP_RANGE'] 
