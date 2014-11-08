@@ -24,7 +24,7 @@ module Isucon4
       end
 
       def redis
-        Redis.current
+        @redis ||= Redis.new(:host => '203.104.111.161', :port => 6379)
       end
 
       def webdav_url
