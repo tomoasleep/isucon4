@@ -105,17 +105,17 @@ end
 
 namespace :nginx do
   task :reload do
-    on roles(:web) do
+    on roles(:app) do
       execute :sudo, 'service nginx reload'
     end
   end
   task :restart do
-    on roles(:web) do
+    on roles(:app) do
       execute :sudo, 'service nginx restart'
     end
   end
   task :start do
-    on roles(:web) do
+    on roles(:app) do
       execute :sudo, 'service nginx start'
     end
   end

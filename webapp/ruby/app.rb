@@ -2,6 +2,7 @@ require 'sinatra/base'
 require 'pathname'
 require 'digest/sha2'
 require 'redis'
+require 'mysql2-cs-bind'
 require 'json'
 require 'rack/request'
 # require 'rack-lineprof'
@@ -19,6 +20,18 @@ module Isucon4
     # use Rack::Lineprof, profile: 'app.rb'
 
     helpers do
+      def connection
+        return $mysql if $mysql
+        $mysql = Mysql2::Client.new(
+          :host      => "203.104.111.161",
+          :port      => 3306,
+          :username  => "isucon",
+          :password  => "isunageruna",
+          :database  => "isucon",
+          :reconnect => true,
+        )
+      end
+
       def advertiser_id
         request.env['HTTP_X_ADVERTISER_ID']
       end
@@ -85,16 +98,21 @@ module Isucon4
       end
 
       def get_log(id)
-        path = LOG_DIR.join(id.split('/').last)
-        return {} unless path.exist?
+        connection.xquery(" SELECT ad_id, user, agent, generation, age, FROM ads
+WHERE advertiser = ?
+GROUP BY ad_id
+", id.split('/').last).first
+        # $mongo.find(id.split('/').last).each.map do |doc|
+        #   doc.merge(decode_user_key(user))
+        # end.group_by { |click| click[:ad_id] }
 
-        open(path, 'r') do |io|
-          io.flock File::LOCK_SH
-          io.read.each_line.map do |line|
-            ad_id, user, agent = line.chomp.split(?\t,3)
-            {ad_id: ad_id, user: user, agent: agent && !agent.empty? ? agent : :unknown}.merge(decode_user_key(user))
-          end.group_by { |click| click[:ad_id] }
-        end
+        # open(path, 'r') do |io|
+        #   io.flock File::LOCK_SH
+        #   io.read.each_line.map do |line|
+        #     ad_id, user, agent = line.chomp.split(?\t,3)
+        #     {ad_id: ad_id, user: user, agent: agent && !agent.empty? ? agent : :unknown}.merge(decode_user_key(user))
+        #   end.group_by { |click| click[:ad_id] }
+        # end
       end
 
       def send_asset(slot, id, asset)
@@ -239,11 +257,21 @@ module Isucon4
         content_type :json
         next {error: :not_found}.to_json
       end
+      tmp = decode_user_key(request.user_agent)
+      #     {ad_id: ad_id, user: user, agent: agent && !agent.empty? ? agent : :unknown}.merge(decode_user_key(user))
+      connection.xquery("INSERT INTO ads VALUES (advertiser, ad_id, user, agent, gender, age) (?, ?, ?, ?, ?, ?) ",
+                     ad['advertiser'].split('/').last,
+                     ad['id'],
+                     request.cookies['isuad'],
+                     request.user_agent,
+                     tmp[:gender],
+                     tmp[:age])
 
-      open(LOG_DIR.join(ad['advertiser'].split('/').last), 'a') do |io|
-        io.flock File::LOCK_EX
-        io.puts([ad['id'], request.cookies['isuad'], request.user_agent].join(?\t))
-      end
+      connection.xquery("UPDATE TABLE click_counter SET counter = counter + 1 WHERE ad_id = ?", ad_key(params[:slot], params[:id]))
+      # open(LOG_DIR.join(ad['advertiser'].split('/').last), 'a') do |io|
+      #   io.flock File::LOCK_EX
+      #   io.puts([ad['id'], request.cookies['isuad'], request.user_agent].join(?\t))
+      # end
 
       redirect ad['destination']
     end
