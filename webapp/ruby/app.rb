@@ -4,6 +4,7 @@ require 'digest/sha2'
 require 'redis'
 require 'json'
 require 'rack/request'
+require 'rack-lineprof'
 
 module Isucon4
   class App < Sinatra::Base
@@ -12,6 +13,8 @@ module Isucon4
     LOG_DIR = Pathname.new(__dir__).join('logs')
     ADS_DIR.mkpath unless ADS_DIR.exist?
     LOG_DIR.mkpath unless LOG_DIR.exist?
+
+    use Rack::Lineprof, profile: 'app.rb'
 
     helpers do
       def advertiser_id
